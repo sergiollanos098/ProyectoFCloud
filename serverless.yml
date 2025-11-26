@@ -1,0 +1,213 @@
+service: kfc-order-system
+
+org: sllanos099
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: us-east-1
+  stage: test
+  iam:
+    role: arn:aws:iam::387765507107:role/LabRole
+
+functions:
+
+  # ------------------------ CUSTOMERS SERVICE --------------------------
+
+  createCustomer:
+    handler: createCustomer.lambda_handler
+    events:
+      - http:
+          path: customers
+          method: post
+          cors: true
+
+  getCustomer:
+    handler: getCustomer.lambda_handler
+    events:
+      - http:
+          path: customers/{customerId}
+          method: get
+          cors: true
+
+  updateCustomer:
+    handler: updateCustomer.lambda_handler
+    events:
+      - http:
+          path: customers/{customerId}
+          method: put
+          cors: true
+
+  createAddress:
+    handler: createAddress.lambda_handler
+    events:
+      - http:
+          path: customers/{customerId}/addresses
+          method: post
+          cors: true
+
+  listAddresses:
+    handler: listAddresses.lambda_handler
+    events:
+      - http:
+          path: customers/{customerId}/addresses
+          method: get
+          cors: true
+
+  updateAddress:
+    handler: updateAddress.lambda_handler
+    events:
+      - http:
+          path: customers/{customerId}/addresses/{addressId}
+          method: put
+          cors: true
+
+  loginCustomer:
+    handler: loginCustomer.lambda_handler
+    events:
+      - http:
+          path: login
+          method: post
+          cors: true
+
+  # ------------------------ ORDERS SERVICE -----------------------------
+
+  createOrder:
+    handler: createOrder.lambda_handler
+    events:
+      - http:
+          path: orders
+          method: post
+          cors: true
+
+  listOrders:
+    handler: listOrders.lambda_handler
+    events:
+      - http:
+          path: orders
+          method: get
+          cors: true
+
+  getOrder:
+    handler: getOrder.lambda_handler
+    events:
+      - http:
+          path: orders/{orderId}
+          method: get
+          cors: true
+
+  updateOrderStatus:
+    handler: updateOrderStatus.lambda_handler
+    events:
+      - http:
+          path: orders/{orderId}/status
+          method: put
+          cors: true
+
+  # ------------------------ WORKFLOW LAMBDAS ---------------------------
+
+  cookOrder:
+    handler: cookOrder.lambda_handler
+    events:
+      - eventBridge:
+          pattern:
+            detail-type:
+              - order.created
+
+  packageOrder:
+    handler: packageOrder.lambda_handler
+    events:
+      - eventBridge:
+          pattern:
+            detail-type:
+              - order.cooking.started
+
+  deliverOrder:
+    handler: deliverOrder.lambda_handler
+    events:
+      - eventBridge:
+          pattern:
+            detail-type:
+              - order.packaging.started
+
+  completeOrder:
+    handler: completeOrder.lambda_handler
+    events:
+      - eventBridge:
+          pattern:
+            detail-type:
+              - order.delivery.started
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+
+
+# -------------------------- DYNAMODB TABLES ----------------------------
+
+resources:
+  Resources:
+
+    CustomersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: CustomersTable
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: customerId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: customerId
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+
+    OrdersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: OrdersTable
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: orderId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: orderId
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+
+    WorkflowEventsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: WorkflowEventsTable
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: orderId#timestamp
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: orderId#timestamp
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+
+    AddressesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: AddressesTable
+        AttributeDefinitions:
+          - AttributeName: tenantId
+            AttributeType: S
+          - AttributeName: customerKey
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenantId
+            KeyType: HASH
+          - AttributeName: customerKey
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
